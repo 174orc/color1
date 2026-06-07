@@ -1,0 +1,416 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>隨機曼陀羅填色遊戲 (響應式 SVG)</title>
+    <style>
+        :root {
+            --bg-color: #f9f9f9;
+            --text-color: #333;
+            --panel-bg: #fff;
+            --border-color: #ddd;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            max-width: 600px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        p.instruction {
+            font-size: 0.95rem;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 700px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+            gap: 20px;
+            position: relative;
+        }
+
+        /* 畫布容器：維持正方形且響應式 */
+        .canvas-container {
+            width: 100%;
+            position: relative;
+            padding-bottom: 100%; /* 1:1 Aspect Ratio */
+            background: #fff;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            user-select: none;
+        }
+
+        /* 填色區塊的基礎樣式 */
+        #game-svg path {
+            cursor: pointer;
+            stroke-width: 1.5px;
+            transition: fill 0.15s ease-out;
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+
+        /* 調色盤 */
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
+            gap: 10px;
+            width: 100%;
+            max-width: 500px;
+            justify-content: center;
+        }
+
+        .color-swatch {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.1s;
+            position: relative;
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+
+        .color-swatch.active {
+            border-color: #000;
+            transform: scale(1.1);
+        }
+
+        /* 自定義顏色 */
+        .custom-color-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .custom-color-input {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 2px solid #ccc;
+            cursor: pointer;
+            padding: 0;
+            overflow: hidden;
+        }
+        .custom-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+        .custom-color-input::-webkit-color-swatch { border: none; }
+
+        /* 按鈕組 */
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button.action-btn {
+            padding: 12px 20px;
+            font-size: 0.95rem;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+            color: #333;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        button.action-btn:hover {
+            background-color: #f5f5f5;
+            border-color: #bbb;
+        }
+
+        button#btn-generate {
+            background-color: #f0f0f0;
+        }
+        
+        button#btn-reset {
+            color: #d9534f;
+            border-color: #d9534f;
+        }
+        button#btn-reset:hover {
+            background-color: #d9534f;
+            color: white;
+        }
+
+        /* 遊戲版本標記 */
+        .version-tag {
+            position: absolute;
+            bottom: 5px;
+            left: 10px;
+            font-size: 10px;
+            color: #999;
+        }
+
+        /* 桌機版版面微調 */
+        @media (min-width: 768px) {
+            .main-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .canvas-container {
+                width: 500px;
+                padding-bottom: 500px;
+                height: 500px;
+            }
+            .control-panel {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>隨機曼陀羅填色遊戲 (響應式 SVG)</h1>
+        <p class="instruction">點擊色票選擇顏色，點擊曼陀羅區域填色。點擊按鈕生成新的圖形。</p>
+    </header>
+
+    <div class="main-container">
+        <div class="canvas-container">
+            <svg id="game-svg" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+                </svg>
+        </div>
+
+        <div class="control-panel">
+            <div class="palette-grid" id="palette">
+                </div>
+
+            <div class="custom-color-container">
+                <input type="color" id="custom-color" class="custom-color-input" value="#ff0000" title="自訂顏色">
+                <span>自定義顏色</span>
+            </div>
+
+            <div class="btn-group">
+                <button class="action-btn" id="btn-generate">生成新圖形</button>
+                <button class="action-btn" id="btn-export">輸出線稿 (SVG)</button>
+                <button class="action-btn" id="btn-reset">重置填色</button>
+            </div>
+        </div>
+        
+        <div class="version-tag">遊戲版本 v1.1 | 參考設計 0.png</div>
+    </div>
+
+    <script>
+        const svgElement = document.getElementById('game-svg');
+        const paletteContainer = document.getElementById('palette');
+        const customColorPicker = document.getElementById('custom-color');
+        
+        const palleteColors = [
+            '#0000FF', '#FF0000', '#FF8C69', '#FFFF00', '#D3FF8C', '#FFC0CB', '#E6E6FA', '#87CEEB', '#ADD8E6', '#DDA0DD', '#A9A9A9', '#f0f0f0', 
+            '#008080', '#32CD32', '#2E8B57', '#B8860B', '#A0522D', '#CD5C5C', '#BC8F8F', '#808080', '#696969', '#000000', '#FFFFFF'
+        ];
+        
+        let currentColor = palleteColors[0];
+        let originalPaths = []; // 用於重置
+
+        // 1. 初始化調色盤
+        function initPalette() {
+            palleteColors.forEach((color, index) => {
+                const swatch = document.createElement('div');
+                swatch.className = `color-swatch ${index === 0 ? 'active' : ''}`;
+                swatch.style.backgroundColor = color;
+                swatch.addEventListener('click', () => {
+                    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                    swatch.classList.add('active');
+                    currentColor = color;
+                });
+                paletteContainer.appendChild(swatch);
+            });
+
+            customColorPicker.addEventListener('input', (e) => {
+                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                currentColor = e.target.value;
+            });
+        }
+
+        // 2. 生成曼陀羅
+        // 為了模擬 image_0.png 的對稱性和層次，我們手動定義多層同心圖形和對稱花瓣。
+        function generateMandala() {
+            svgElement.innerHTML = ''; 
+            const width = 500;
+            const height = 500;
+            const cx = width / 2;
+            const cy = height / 2;
+            
+            // 背景底色塊 (白色)
+            const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            bg.setAttribute("width", width);
+            bg.setAttribute("height", height);
+            bg.setAttribute("fill", "#ffffff");
+            svgElement.appendChild(bg);
+
+            // 曼陀羅生成參數
+            const symmetry = 12; // 12-fold對稱
+            const layers = [
+                { r: 25, type: 'flower' },
+                { r: 70, type: 'petal', fill: '#fefefe' },
+                { r: 120, type: 'petal', fill: '#fcfcfc' },
+                { r: 160, type: 'scroll' },
+                { r: 210, type: 'ring' },
+                { r: 230, type: 'outer_border' }
+            ];
+
+            originalPaths = [];
+
+            layers.forEach(layer => {
+                for (let i = 0; i < symmetry; i++) {
+                    const angle = (i * 360) / symmetry;
+                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    let d = '';
+                    let fill = layer.fill || '#ffffff';
+
+                    if (layer.type === 'flower') {
+                        // 中心花瓣
+                        const r1 = layer.r * 0.4;
+                        const r2 = layer.r * 1.2;
+                        d = `M ${cx} ${cy - r1} C ${cx + r2} ${cy - r1}, ${cx + r2} ${cy + r1}, ${cx} ${cy + r1} C ${cx - r2} ${cy + r1}, ${cx - r2} ${cy - r1}, ${cx} ${cy - r1} Z`;
+                        path.setAttribute('transform', `rotate(${angle} ${cx} ${cy})`);
+                    } else if (layer.type === 'petal') {
+                        // 層次花瓣
+                        const innerR = layer.r * 0.8;
+                        const outerR = layer.r * 1.2;
+                        const widthA = layer.r * 0.3;
+                        d = `M ${cx} ${cy - innerR} C ${cx + widthA} ${cy - outerR}, ${cx + widthA} ${cy - outerR}, ${cx} ${cy - layer.r * 1.5} C ${cx - widthA} ${cy - outerR}, ${cx - widthA} ${cy - outerR}, ${cx} ${cy - innerR} Z`;
+                        path.setAttribute('transform', `rotate(${angle + 180/symmetry} ${cx} ${cy})`);
+                    } else if (layer.type === 'scroll') {
+                        // 渦卷飾
+                        const r = layer.r;
+                        d = `M ${cx} ${cy - r} C ${cx + 15} ${cy - r - 30}, ${cx + 45} ${cy - r}, ${cx + 15} ${cy - r + 30} C ${cx - 15} ${cy - r + 30}, ${cx - 45} ${cy - r}, ${cx - 15} ${cy - r - 30} Z`;
+                        path.setAttribute('transform', `rotate(${angle} ${cx} ${cy})`);
+                    } else if (layer.type === 'ring') {
+                        // 圓環裝飾
+                        d = `M ${cx} ${cy - layer.r} A ${layer.r} ${layer.r} 0 1 0 ${cx} ${cy + layer.r} A ${layer.r} ${layer.r} 0 1 0 ${cx} ${cy - layer.r} Z`;
+                        // 圓環不需要旋轉對稱，但要加上
+                        if (i === 0) {
+                            svgElement.appendChild(path);
+                            setupPath(path, layer, d);
+                            originalPaths.push(path.cloneNode(true));
+                            return; 
+                        } else { return; } 
+                    } else if (layer.type === 'outer_border') {
+                        // 外框
+                        d = `M ${cx} ${cy - layer.r} A ${layer.r} ${layer.r} 0 1 0 ${cx} ${cy + layer.r} A ${layer.r} ${layer.r} 0 1 0 ${cx} ${cy - layer.r} Z`;
+                        if (i === 0) {
+                            path.setAttribute('stroke-width', '2.5px');
+                            svgElement.appendChild(path);
+                            setupPath(path, layer, d);
+                            originalPaths.push(path.cloneNode(true));
+                            return; 
+                        } else { return; } 
+                    }
+
+                    setupPath(path, layer, d, fill);
+                    svgElement.appendChild(path);
+                    originalPaths.push(path.cloneNode(true));
+                }
+            });
+
+            bindColoringEvent();
+        }
+
+        function setupPath(path, layer, d, fill = '#ffffff') {
+            path.setAttribute("d", d);
+            path.setAttribute("fill", fill);
+            path.setAttribute("stroke", "#000000");
+        }
+
+        // 3. 綁定填色事件
+        function bindColoringEvent() {
+            const shapes = svgElement.querySelectorAll('path:not([width])'); // 排除rect背景
+            shapes.forEach(shape => {
+                shape.addEventListener('click', (e) => {
+                    e.target.setAttribute('fill', currentColor);
+                });
+            });
+        }
+
+        // 4. 重置填色
+        function resetColoring() {
+            const shapes = svgElement.querySelectorAll('path:not([width])');
+            shapes.forEach((shape, index) => {
+                const original = originalPaths[index];
+                shape.setAttribute('fill', original.getAttribute('fill'));
+            });
+        }
+
+        // 5. 導出 SVG 線稿文件
+        function exportSVGOutline() {
+            const cloneSvg = svgElement.cloneNode(true);
+            const shapes = cloneSvg.querySelectorAll('path:not([width])');
+            shapes.forEach(shape => {
+                shape.setAttribute('fill', '#ffffff');
+                shape.setAttribute('stroke', '#000000');
+            });
+
+            const svgString = new XMLSerializer().serializeToString(cloneSvg);
+            const blob = new Blob([svgString], {type: 'image/svg+xml;charset=utf-8'});
+            const URL = window.URL || window.webkitURL || window;
+            const blobURL = URL.createObjectURL(blob);
+            
+            const downloadLink = document.createElement('a');
+            downloadLink.href = blobURL;
+            downloadLink.download = 'mandala-coloring-book.svg';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+
+        // 事件監聽
+        document.getElementById('btn-generate').addEventListener('click', generateMandala);
+        document.getElementById('btn-export').addEventListener('click', exportSVGOutline);
+        document.getElementById('btn-reset').addEventListener('click', resetColoring);
+
+        // 初始化執行
+        initPalette();
+        generateMandala();
+    </script>
+</body>
+</html>
